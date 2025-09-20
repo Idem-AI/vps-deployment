@@ -20,7 +20,7 @@ NGINX_DATA_DIR="$NGINX_DIR/data"
 CONF_DIR="$NGINX_DATA_DIR/nginx"          # dossier cible pour les .conf (adaptable)
 TMP_DIR="/tmp/${APP_NAME}_deploy"
 TMP_INIT_BASE="$NGINX_DIR/init-letsencrypt.sh"  # template d'origine dans le repo
-DEFAULT_FRONT_DOM="angular.azopat.cm"
+DEFAULT_FRONT_DOM="angular-app.azopat.cm"
 DEFAULT_BACK_DOM="backend.azopat.cm"
 
 FRONT_DOMAIN="${FRONT_DOMAIN_ARG:-$DEFAULT_FRONT_DOM}"
@@ -346,30 +346,44 @@ cd "$NGINX_DIR"
 docker-compose exec nginx nginx -s reload || docker-compose restart nginx || true
 
 # 7) Injection variable API_URL dans le frontend
-echo "[7/7] Ajout de la variable API_URL au service frontend..."
+echo "[7/7] Gestion des variables d'environnements..."
+
+echo "copie du .env dans le repertoire de deploiement..."
+
+mv $APP_BASE/.env $APP_DIR/docker/
 
 COMPOSE_FILE="$APP_DIR/docker/docker-compose.yml"
+ENV_FILE="$APP_DIR/docker/.env"
 
-if grep -q "^\s*environment:" "$COMPOSE_FILE"; then
-  # Il existe déjà une section environment
-  if grep -q "API_URL" "$COMPOSE_FILE"; then
-    # Remplacer la valeur existante
-    sed -i "s#^\(\s*API_URL\s*=\s*\).*#\1\"https://$BACK_DOMAIN\"#" "$COMPOSE_FILE"
-    echo "  -> API_URL mis à jour dans docker-compose.yml"
+# Ajouter API_URL dans le .env
+echo "API_URL=https://$BACK_DOMAIN" >> "$ENV_FILE"
+echo "  -> Ajout API_URL=https://$BACK_DOMAIN dans .env"
+
+# Récupérer tous les services et leur ajouter env_file
+
+echo "[+] Ajout de env_file: .env dans tous les services de $COMPOSE_FILE"
+
+# Extraire les services (indentés sous services:)
+services=$(awk '/^services:/ {in_services=1; next} in_services && /^[^[:space:]]/ {exit} in_services && /^[[:space:]]{2}[a-zA-Z0-9_-]+:/ {print $1}' "$COMPOSE_FILE" | sed 's/://')
+
+for svc in $services; do
+  echo "  -> Service: $svc"
+  # Vérifier si déjà présent
+  if grep -A5 "^[[:space:]]{2}$svc:" "$COMPOSE_FILE" | grep -q "env_file:"; then
+    echo "     (déjà présent, ignoré)"
   else
-    # Ajouter API_URL sous environment:
-    sed -i "/^\s*environment:/a \ \ \ \ - API_URL=https://$BACK_DOMAIN" "$COMPOSE_FILE"
-    echo "  -> API_URL ajouté dans docker-compose.yml"
+    # Ajouter env_file après la ligne du service
+    sed -i "/^[[:space:]]\{2\}$svc:/a\ \ \ \ env_file:\n\ \ \ \ \ \ - .env" "$COMPOSE_FILE"
+    echo "     (ajouté)"
   fi
-else
-  # Pas de section environment → on l’ajoute
-  sed -i "/$FRONT_SVC:/a \ \ environment:\n\ \ \ \ - API_URL=https://$BACK_DOMAIN" "$COMPOSE_FILE"
-  echo "  -> section environment ajoutée avec API_URL"
-fi
+done
 
-# Relancer uniquement le frontend pour appliquer le changement
+echo "[✓] Terminé"
+
+# Relancer tous les services
 cd "$APP_DIR/docker"
-docker-compose up -d "$FRONT_SVC"
+docker-compose up -d
+
 
 
 echo
