@@ -14,8 +14,8 @@ FRONT_DOMAIN_ARG="${2:-}"
 BACK_DOMAIN_ARG="api.${FRONT_DOMAIN_ARG}"   
 
 # Config (modifiable)
-APP_BASE="/opt/apps"                      # où on clone les apps
-NGINX_DIR="/opt/nginx-certbot"            # repo nginx-certbot existant
+APP_BASE="/opt/vps-deployment/apps"                      # où on clone les apps
+NGINX_DIR="/opt/vps-deployment/nginx-certbot"            # repo nginx-certbot existant
 NGINX_DATA_DIR="$NGINX_DIR/data"
 CONF_DIR="$NGINX_DATA_DIR/nginx"          # dossier cible pour les .conf (adaptable)
 TMP_DIR="/tmp/${APP_NAME}_deploy"
