@@ -1,0 +1,1 @@
+directory to static file
