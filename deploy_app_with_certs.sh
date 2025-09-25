@@ -56,7 +56,55 @@ fi
 
 # 2) Lancer docker-compose de l'app
 echo "[2/6] Lancement docker-compose de l'application..."
+
+
+echo "Gestion des variables d'environnements..."
+
+echo "copie du .env dans le repertoire de deploiement..."
+
+# Vérifier si le .env existe dans APP_BASE
+if [ ! -f "$APP_BASE/.env" ]; then
+  echo "Aucun .env trouvé dans $APP_BASE, création d'un fichier vide..."
+  touch "$APP_BASE/.env"
+fi
+
+# S'assurer que le répertoire docker existe
+mkdir -p "$APP_DIR/docker"
+
+# Déplacer le .env
+mv "$APP_BASE/.env" "$APP_DIR/docker/"
+
+
+COMPOSE_FILE="$APP_DIR/docker/docker-compose.yml"
+ENV_FILE="$APP_DIR/docker/.env"
+
+# Ajouter API_URL dans le .env
+echo "API_URL=https://$BACK_DOMAIN" >> "$ENV_FILE"
+echo "  -> Ajout API_URL=https://$BACK_DOMAIN dans .env"
+
+# Récupérer tous les services et leur ajouter env_file
+
+echo "[+] Ajout de env_file: .env dans tous les services de $COMPOSE_FILE"
+
+# Extraire les services (indentés sous services:)
+services=$(awk '/^services:/ {in_services=1; next} in_services && /^[^[:space:]]/ {exit} in_services && /^[[:space:]]{2}[a-zA-Z0-9_-]+:/ {print $1}' "$COMPOSE_FILE" | sed 's/://')
+
+for svc in $services; do
+  echo "  -> Service: $svc"
+  # Vérifier si déjà présent
+  if grep -A5 "^[[:space:]]{2}$svc:" "$COMPOSE_FILE" | grep -q "env_file:"; then
+    echo "     (déjà présent, ignoré)"
+  else
+    # Ajouter env_file après la ligne du service
+    sed -i "/^[[:space:]]\{2\}$svc:/a\ \ \ \ env_file:\n\ \ \ \ \ \ - .env" "$COMPOSE_FILE"
+    echo "     (ajouté)"
+  fi
+done
+
+echo "[✓] Terminé"
+
 cd "$APP_DIR/docker"
+
 #docker-compose down || true
 docker-compose up -d --remove-orphans
 
@@ -344,47 +392,6 @@ run_init_for_domain "$BACK_DOMAIN" "$EMAIL"
 echo "Reloading nginx to apply new confs..."
 cd "$NGINX_DIR"
 docker-compose exec nginx nginx -s reload || docker-compose restart nginx || true
-
-# 7) Injection variable API_URL dans le frontend
-echo "[7/7] Gestion des variables d'environnements..."
-
-echo "copie du .env dans le repertoire de deploiement..."
-
-mv $APP_BASE/.env $APP_DIR/docker/
-
-COMPOSE_FILE="$APP_DIR/docker/docker-compose.yml"
-ENV_FILE="$APP_DIR/docker/.env"
-
-# Ajouter API_URL dans le .env
-echo "API_URL=https://$BACK_DOMAIN" >> "$ENV_FILE"
-echo "  -> Ajout API_URL=https://$BACK_DOMAIN dans .env"
-
-# Récupérer tous les services et leur ajouter env_file
-
-echo "[+] Ajout de env_file: .env dans tous les services de $COMPOSE_FILE"
-
-# Extraire les services (indentés sous services:)
-services=$(awk '/^services:/ {in_services=1; next} in_services && /^[^[:space:]]/ {exit} in_services && /^[[:space:]]{2}[a-zA-Z0-9_-]+:/ {print $1}' "$COMPOSE_FILE" | sed 's/://')
-
-for svc in $services; do
-  echo "  -> Service: $svc"
-  # Vérifier si déjà présent
-  if grep -A5 "^[[:space:]]{2}$svc:" "$COMPOSE_FILE" | grep -q "env_file:"; then
-    echo "     (déjà présent, ignoré)"
-  else
-    # Ajouter env_file après la ligne du service
-    sed -i "/^[[:space:]]\{2\}$svc:/a\ \ \ \ env_file:\n\ \ \ \ \ \ - .env" "$COMPOSE_FILE"
-    echo "     (ajouté)"
-  fi
-done
-
-echo "[✓] Terminé"
-
-# Relancer tous les services
-cd "$APP_DIR/docker"
-docker-compose up -d
-
-
 
 echo
 echo "=== Déploiement terminé pour $APP_NAME ==="
