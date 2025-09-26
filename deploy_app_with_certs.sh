@@ -20,8 +20,8 @@ NGINX_DATA_DIR="$NGINX_DIR/data"
 CONF_DIR="$NGINX_DATA_DIR/nginx"          # dossier cible pour les .conf (adaptable)
 TMP_DIR="/tmp/${APP_NAME}_deploy"
 TMP_INIT_BASE="$NGINX_DIR/init-letsencrypt.sh"  # template d'origine dans le repo
-DEFAULT_FRONT_DOM="angular-app.azopat.cm"
-DEFAULT_BACK_DOM="backend.azopat.cm"
+DEFAULT_FRONT_DOM="${APP_NAME}.idem.africa"
+DEFAULT_BACK_DOM="api.${APP_NAME}.idem.africa"
 
 FRONT_DOMAIN="${FRONT_DOMAIN_ARG:-$DEFAULT_FRONT_DOM}"
 BACK_DOMAIN="${FRONT_DOMAIN_ARG:-$DEFAULT_BACK_DOM}"
@@ -69,14 +69,14 @@ if [ ! -f "$APP_BASE/.env" ]; then
 fi
 
 # S'assurer que le répertoire docker existe
-mkdir -p "$APP_DIR/docker"
+mkdir -p "$APP_DIR/"
 
 # Déplacer le .env
-mv "$APP_BASE/.env" "$APP_DIR/docker/"
+mv "$APP_BASE/.env" "$APP_DIR/"
 
 
 COMPOSE_FILE="$APP_DIR/docker/docker-compose.yml"
-ENV_FILE="$APP_DIR/docker/.env"
+ENV_FILE="$APP_DIR/.env"
 
 # Ajouter API_URL dans le .env
 echo "API_URL=https://$BACK_DOMAIN" >> "$ENV_FILE"
