@@ -9,7 +9,7 @@ set -euo pipefail
 # ./deploy_app_with_certs.sh  https://git.example.com/myapp.git  larc.cm 
 GIT_REPO="$1"
 APP_NAME=$(basename -s .git $GIT_REPO)
-EMAIL="romuald.djeteje@idem.africa"            # optional
+EMAIL="ia.deploy@idem.africa"            # optional
 FRONT_DOMAIN_ARG="${2:-}"
 BACK_DOMAIN_ARG="api.${FRONT_DOMAIN_ARG}"   
 
@@ -87,16 +87,17 @@ echo "  -> Ajout API_URL=https://$BACK_DOMAIN dans .env"
 echo "[+] Ajout de env_file: .env dans tous les services de $COMPOSE_FILE"
 
 # Extraire les services (indentés sous services:)
-services=$(awk '/^services:/ {in_services=1; next} in_services && /^[^[:space:]]/ {exit} in_services && /^[[:space:]]{2}[a-zA-Z0-9_-]+:/ {print $1}' "$COMPOSE_FILE" | sed 's/://')
+services=$(yq e '.services | keys | .[]' "$COMPOSE_FILE")
 
 for svc in $services; do
   echo "  -> Service: $svc"
-  # Vérifier si déjà présent
-  if grep -A5 "^[[:space:]]{2}$svc:" "$COMPOSE_FILE" | grep -q "env_file:"; then
+
+  # Vérifier si env_file est déjà défini pour ce service
+  if yq e ".services.$svc.env_file" "$COMPOSE_FILE" >/dev/null 2>&1; then
     echo "     (déjà présent, ignoré)"
   else
-    # Ajouter env_file après la ligne du service
-    sed -i "/^[[:space:]]\{2\}$svc:/a\ \ \ \ env_file:\n\ \ \ \ \ \ - .env" "$COMPOSE_FILE"
+    # Ajouter env_file
+    yq e -i ".services.$svc.env_file = [\".env\"]" "$COMPOSE_FILE"
     echo "     (ajouté)"
   fi
 done
